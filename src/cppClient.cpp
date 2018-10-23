@@ -1,0 +1,61 @@
+#include <iostream>
+#include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/transport/TSocket.h>
+#include <thrift/transport/TTransportUtils.h>
+#include <thrift/stdcxx.h>
+#include "gen-cpp/Calculator.h"
+
+using namespace std;
+using namespace apache::thrift;
+using namespace apache::thrift::protocol;
+using namespace apache::thrift::transport;
+
+using namespace tutorial;
+using namespace shared;
+
+int main() {
+    stdcxx::shared_ptr<TTransport> socket(new TSocket("localhost", 9090));
+    stdcxx::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+    stdcxx::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+    CalculatorClient client(protocol);
+
+    try {
+        transport->open();
+
+        client.ping();
+        cout << "ping()" << endl;
+
+        cout << "100 + 12 = " << client.add(100, 12) << endl;
+
+        Work work;
+        work.op = Operation::DIVIDE;
+        work.num1 = 50;
+        work.num2 = 3;
+
+        try {
+            int32_t ret = client.calculate(1, work);
+            cout << "50/3 ="<<ret << endl;
+        } catch (InvalidOperation& io) {
+            cout << "InvalidOperation: " << io.why << endl;
+            // or using generated operator<<: cout << io << endl;
+            // p
+            // or by using std::exception native method what(): cout << io.what() << endl;
+        }
+
+        work.op = Operation::SUBTRACT;
+        work.num1 = 15;
+        work.num2 = 10;
+        int32_t diff = client.calculate(1, work);
+        cout << "15 - 10 = " << diff << endl;
+
+        // Note that C++ uses return by reference for complex types to avoid
+        // costly copy construction
+        SharedStruct ss;
+        client.getStruct(ss, 1);
+        cout << "Received log: " << ss << endl;
+
+        transport->close();
+    } catch (TException& tx) {
+        cout << "ERROR: " << tx.what() << endl;
+    }
+}
